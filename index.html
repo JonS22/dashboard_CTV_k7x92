@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Informes CTV</title>
+<title>CTV Reports</title>
 <style>
   :root {
     --bg: #F5F7FA; --surface: #FFFFFF; --text: #1B2430; --muted: #5B6676;
@@ -76,37 +76,47 @@
   details.ms label { display: flex; gap: 8px; padding: 4px 12px; cursor: pointer; white-space: nowrap; }
   details.ms label:hover { background: var(--brand-soft); }
   .check { display: flex; align-items: center; gap: 8px; padding: 8px 4px; }
-  .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 16px; }
-  .w { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent);
-       border-radius: 8px; padding: 12px 14px; min-width: 0; }
-  .w h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
-  .w .name { font-weight: 600; overflow-wrap: anywhere; }
-  .w .sub { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin-top: 2px; }
-  .w .cpv { font-size: 22px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; margin-top: 8px; }
-  .w .cpv small { font-size: 13px; font-weight: 400; color: var(--muted); }
-  .w ol { margin: 0; padding-left: 20px; }
-  .w li { padding: 3px 0; font-variant-numeric: tabular-nums; }
-  .w li b { color: var(--accent); }
-  .w .none { color: var(--muted); }
+  .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 12px; margin-top: 16px; }
+  .w { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+  .w h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+  .w .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .w .cols { grid-template-columns: 1fr; } }
+  .rank h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; padding-bottom: 4px; border-bottom: 2px solid var(--accent); color: var(--accent); }
+  .rank.worst h4 { border-color: var(--danger); color: var(--danger); }
+  .rank ol { margin: 0; padding-left: 20px; }
+  .rank li { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .rank li:last-child { border-bottom: 0; }
+  .rank li::marker { color: var(--muted); font-size: 12px; }
+  .rank li { display: list-item; }
+  .rank li > div { display: inline-block; vertical-align: top; }
+  .rank li .lbl { width: calc(100% - 92px); }
+  .rank li .val { width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
+  .rank .name { display: block; font-size: 13px; overflow-wrap: break-word; }
+  .rank .sub { display: block; font-size: 12px; color: var(--muted); overflow-wrap: break-word; }
+  .rank .val span { display: block; font-weight: 600; font-size: 13px; }
+  .rank .val small { display: block; font-size: 11px; color: var(--muted); }
+  .rank.best .val span { color: var(--accent); }
+  .rank .val .bad { color: var(--danger); }
+  .w .none { color: var(--muted); font-size: 13px; }
   .pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 10px; color: var(--muted); }
   .muted { color: var(--muted); }
 </style>
 </head>
 <body>
 <header>
-  <h1>Informes CTV</h1>
+  <h1>CTV Reports</h1>
   <nav role="tablist">
-    <button role="tab" id="tab-atr" aria-selected="true" aria-controls="panel-atr">Atribución</button>
-    <button role="tab" id="tab-opt" aria-selected="false" aria-controls="panel-opt">Optimización</button>
+    <button role="tab" id="tab-atr" aria-selected="true" aria-controls="panel-atr">Attribution</button>
+    <button role="tab" id="tab-opt" aria-selected="false" aria-controls="panel-opt">Optimization</button>
   </nav>
 </header>
 
 <main>
-  <!-- ======================= ATRIBUCIÓN ======================= -->
+  <!-- ======================= ATTRIBUTION ======================= -->
   <section class="panel" id="panel-atr" role="tabpanel" aria-labelledby="tab-atr">
     <div class="drop" id="drop-atr" tabindex="0">
-      <strong>Arrastra aquí el CSV de atribución</strong>
-      <span>o haz clic para elegirlo (ctv_attribution_AAAA-MM-DD.csv)</span>
+      <strong>Drop the attribution CSV here</strong>
+      <span>or click to browse (ctv_attribution_YYYY-MM-DD.csv)</span>
     </div>
     <input type="file" id="file-atr" accept=".csv" hidden>
     <div class="error" id="err-atr" role="alert"></div>
@@ -114,17 +124,17 @@
       <div class="kpis" id="kpis-atr"></div>
       <div class="toolbar">
         <span class="muted" id="info-atr"></span>
-        <button class="btn" id="dl-atr">Descargar Excel</button>
+        <button class="btn" id="dl-atr">Download Excel</button>
       </div>
       <div class="table-wrap"><table id="tbl-atr"></table></div>
     </div>
   </section>
 
-  <!-- ======================= OPTIMIZACIÓN ======================= -->
+  <!-- ======================= OPTIMIZATION ======================= -->
   <section class="panel" id="panel-opt" role="tabpanel" aria-labelledby="tab-opt" hidden>
     <div class="drop" id="drop-opt" tabindex="0">
-      <strong>Arrastra aquí el CSV de optimización</strong>
-      <span>o haz clic para elegirlo (ctv_attribution_AAAA-MM-DD_optimizacion.csv)</span>
+      <strong>Drop the optimization CSV here</strong>
+      <span>or click to browse (ctv_attribution_YYYY-MM-DD_optimizacion.csv)</span>
     </div>
     <input type="file" id="file-opt" accept=".csv" hidden>
     <div class="error" id="err-opt" role="alert"></div>
@@ -134,8 +144,8 @@
       <div class="toolbar">
         <span class="muted" id="info-opt"></span>
         <span>
-          <button class="btn ghost" id="clear-opt">Quitar filtros</button>
-          <button class="btn" id="dl-opt">Descargar Excel (con filtros aplicados)</button>
+          <button class="btn ghost" id="clear-opt">Clear filters</button>
+          <button class="btn" id="dl-opt">Download Excel (filtered)</button>
         </span>
       </div>
       <div class="table-wrap"><table id="tbl-opt"></table></div>
@@ -199,25 +209,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 <script>
 "use strict";
 
-/* ----------------------------------------------------------- configuración */
+/* ----------------------------------------------------------- config */
 const COLS_ATR = ["campaign_name", "order_name", "line_item_name", "impressions", "cost", "visits"];
 const COLS_OPT = ["campaign_name", "order_name", "line_item_name", "line_item_id", "banner", "targeting_group",
                   "app_id", "dealid", "date", "hour", "impressions", "cost", "visits"];
 const SHOW_OPT = [...COLS_OPT, "cost_per_visit"];
 const NUM_OPT = new Set(["hour", "impressions", "cost", "visits"]);
-// Los IDs se leen como texto: app_id mezcla números y nombres (p. ej. "titan_os").
-// En Excel, line_item_id y dealid se escriben como número; app_id siempre como texto.
+// IDs are read as text: app_id mixes numbers and names (e.g. "titan_os").
+// In Excel, line_item_id and dealid are written as numbers; app_id always as text.
 const PAGE = 100;
 
 /* ------------------------------------------------------------- formateo */
-const fInt = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" });
-const fDec = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
-const fDec4 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+const fInt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0, useGrouping: "always" });
+const fDec = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
+const fDec4 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
 const baseName = n => n.replace(/\.csv$/i, "");
 
-/* ----------------------------------------------------------- pestañas */
+/* ----------------------------------------------------------- tabs */
 document.querySelectorAll('[role="tab"]').forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll('[role="tab"]').forEach(t => {
@@ -249,20 +259,20 @@ function parseCsv(file, required, errId) {
   const err = document.getElementById(errId);
   err.textContent = "";
   return new Promise(resolve => {
-    if (!/\.csv$/i.test(file.name)) { err.textContent = `"${file.name}" no es un CSV. Sube un archivo .csv.`; return resolve(null); }
+    if (!/\.csv$/i.test(file.name)) { err.textContent = `"${file.name}" is not a CSV. Please upload a .csv file.`; return resolve(null); }
     Papa.parse(file, {
       header: true, skipEmptyLines: true, dynamicTyping: false,
       complete: res => {
         const cols = res.meta.fields || [];
         const missing = required.filter(c => !cols.includes(c));
         if (missing.length) {
-          err.textContent = `Al archivo le faltan estas columnas: ${missing.join(", ")}. Comprueba que lo has soltado en la pestaña correcta.`;
+          err.textContent = `This file is missing these columns: ${missing.join(", ")}. Check that you dropped it on the right tab.`;
           return resolve(null);
         }
-        if (!res.data.length) { err.textContent = "El archivo no tiene filas de datos."; return resolve(null); }
+        if (!res.data.length) { err.textContent = "The file has no data rows."; return resolve(null); }
         resolve(res.data);
       },
-      error: e => { err.textContent = "No se pudo leer el archivo: " + e.message; resolve(null); }
+      error: e => { err.textContent = "Could not read the file: " + e.message; resolve(null); }
     });
   });
 }
@@ -286,7 +296,7 @@ function styleHeader(ws, ncols) {
 
 async function saveWorkbook(wb, fileName, btn) {
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Generando…";
+  btn.disabled = true; btn.textContent = "Generating…";
   try {
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -297,7 +307,7 @@ async function saveWorkbook(wb, fileName, btn) {
   } finally { btn.disabled = false; btn.textContent = label; }
 }
 
-/* ============================================================ ATRIBUCIÓN */
+/* ============================================================ ATTRIBUTION */
 let atr = null; // { rows, name }
 
 function prepAtr(raw) {
@@ -318,8 +328,8 @@ function renderAtr() {
   const cpv = T.vis ? T.cost / T.vis : null;
 
   document.getElementById("kpis-atr").innerHTML = [
-    ["Impresiones", fInt.format(T.imp)], ["Coste", fDec.format(T.cost)], ["Visitas", fInt.format(T.vis)],
-    ["Coste por visita", cpv == null ? "—" : fDec.format(cpv), true]
+    ["Impressions", fInt.format(T.imp)], ["Cost", fDec.format(T.cost)], ["Visits", fInt.format(T.vis)],
+    ["Cost per visit", cpv == null ? "—" : fDec.format(cpv), true]
   ].map(([l, v, hl]) => `<div class="kpi${hl ? " hl" : ""}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
   document.getElementById("info-atr").textContent = `${rows.length} line items`;
@@ -342,7 +352,7 @@ function renderAtr() {
 
 function buildAtrWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Atribución", { views: [{ state: "frozen", ySplit: 1 }] });
+  const ws = wb.addWorksheet("Attribution", { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = [
     { header: "campaign_name", width: 34 }, { header: "order_name", width: 18 },
     { header: "line_item_name", width: 38 }, { header: "impressions", width: 14, style: { numFmt: XL.int } },
@@ -374,16 +384,16 @@ setupDrop("drop-atr", "file-atr", async file => {
   const raw = await parseCsv(file, COLS_ATR, "err-atr");
   if (!raw) return;
   atr = { rows: prepAtr(raw), name: baseName(file.name) };
-  compactDrop("drop-atr", file.name, "Arrastra otro CSV o haz clic para cambiarlo");
+  compactDrop("drop-atr", file.name, "Drop another CSV or click to replace it");
   renderAtr();
 });
 document.getElementById("dl-atr").addEventListener("click", e =>
   saveWorkbook(buildAtrWorkbook(atr.rows), atr.name + ".xlsx", e.currentTarget));
 
-/* ========================================================== OPTIMIZACIÓN */
+/* ========================================================== OPTIMIZATION */
 let opt = null; // { rows, name, filtered, page }
-const FILTERS = [["order_name", "Order"], ["line_item_name", "Line item"], ["banner", "Banner"], ["date", "Fecha"],
-                 ["app_id", "App ID"], ["dealid", "Deal ID"], ["hour", "Hora"]];
+const FILTERS = [["order_name", "Order"], ["line_item_name", "Line item"], ["banner", "Banner"], ["date", "Date"],
+                 ["app_id", "App ID"], ["dealid", "Deal ID"], ["hour", "Hour"]];
 
 function prepOpt(raw) {
   return raw.map(r => {
@@ -399,9 +409,9 @@ function buildFilters() {
   box.innerHTML = FILTERS.map(([k, label]) => {
     const vals = [...new Set(opt.rows.map(r => r[k]))].sort((a, b) =>
       String(a).localeCompare(String(b), "es", { numeric: true }));
-    return `<details class="ms" data-key="${k}"><summary><span>${label}</span><small>Todos</small></summary>
+    return `<details class="ms" data-key="${k}"><summary><span>${label}</span><small>All</small></summary>
       <div class="opts">${vals.map(v => `<label><input type="checkbox" value="${esc(v)}">${esc(v)}</label>`).join("")}</div></details>`;
-  }).join("") + `<label class="check"><input type="checkbox" id="only-visits"> Solo filas con visitas</label>`;
+  }).join("") + `<label class="check"><input type="checkbox" id="only-visits"> Only rows with visits</label>`;
 
   box.querySelectorAll("details.ms").forEach(d => {
     d.addEventListener("toggle", () => {
@@ -409,7 +419,7 @@ function buildFilters() {
     });
     d.addEventListener("change", () => {
       const n = d.querySelectorAll("input:checked").length;
-      d.querySelector("small").textContent = n ? `${n} seleccionado${n > 1 ? "s" : ""}` : "Todos";
+      d.querySelector("small").textContent = n ? `${n} selected` : "All";
       applyOpt();
     });
   });
@@ -438,9 +448,9 @@ function renderOpt() {
   const T = { imp: sum(rows, "impressions"), cost: sum(rows, "cost"), vis: sum(rows, "visits") };
 
   document.getElementById("info-opt").textContent =
-    `${fInt.format(rows.length)} de ${fInt.format(opt.rows.length)} filas · ${fInt.format(T.imp)} impresiones · ` +
-    `coste ${fDec.format(T.cost)} · ${fInt.format(T.vis)} visitas · ` +
-    `coste por visita ${T.vis ? fDec.format(T.cost / T.vis) : "—"}`;
+    `${fInt.format(rows.length)} of ${fInt.format(opt.rows.length)} rows · ${fInt.format(T.imp)} impressions · ` +
+    `cost ${fDec.format(T.cost)} · ${fInt.format(T.vis)} visits · ` +
+    `cost per visit ${T.vis ? fDec.format(T.cost / T.vis) : "—"}`;
 
   renderWidgets(rows);
 
@@ -451,12 +461,12 @@ function renderOpt() {
   document.getElementById("tbl-opt").innerHTML =
     `<thead><tr>${SHOW_OPT.map(h => `<th class="${num.has(h) ? "n" : ""}">${h}</th>`).join("")}</tr></thead>` +
     `<tbody>${slice.length ? slice.map(r => `<tr>${SHOW_OPT.map(k => cell(k, r[k])).join("")}</tr>`).join("")
-      : `<tr><td colspan="${SHOW_OPT.length}" class="empty">Ninguna fila cumple los filtros. Quita alguno para ver datos.</td></tr>`}</tbody>`;
+      : `<tr><td colspan="${SHOW_OPT.length}" class="empty">No rows match the filters. Clear some filters to see data.</td></tr>`}</tbody>`;
 
   document.getElementById("pager-opt").innerHTML = pages > 1
-    ? `<button class="btn ghost" id="pg-prev" ${opt.page === 0 ? "disabled" : ""}>Anterior</button>
-       <span>Página ${opt.page + 1} de ${pages}</span>
-       <button class="btn ghost" id="pg-next" ${opt.page >= pages - 1 ? "disabled" : ""}>Siguiente</button>` : "";
+    ? `<button class="btn ghost" id="pg-prev" ${opt.page === 0 ? "disabled" : ""}>Previous</button>
+       <span>Page ${opt.page + 1} of ${pages}</span>
+       <button class="btn ghost" id="pg-next" ${opt.page >= pages - 1 ? "disabled" : ""}>Next</button>` : "";
   if (pages > 1) {
     document.getElementById("pg-prev").onclick = () => { opt.page--; renderOpt(); };
     document.getElementById("pg-next").onclick = () => { opt.page++; renderOpt(); };
@@ -465,45 +475,59 @@ function renderOpt() {
   document.getElementById("out-opt").hidden = false;
 }
 
-/* Agrupa filas y calcula coste por visita = coste total / visitas totales del grupo.
-   Los grupos sin visitas no compiten (su coste por visita no existe). */
-function bestBy(rows, keyFn) {
+/* Groups rows and computes cost per visit = total group cost / total group visits.
+   Best: groups with visits, lowest CPV first.
+   Worst: groups that spent with zero visits come first (highest spend first),
+   then groups with visits, highest CPV first. */
+function rankBy(rows, keyFn) {
   const m = new Map();
   rows.forEach(r => {
     const k = keyFn(r);
     const g = m.get(k) || { key: k, row: r, cost: 0, visits: 0 };
     g.cost += r.cost; g.visits += r.visits; m.set(k, g);
   });
-  return [...m.values()].filter(g => g.visits > 0)
-    .map(g => ({ ...g, cpv: g.cost / g.visits }))
-    .sort((a, b) => a.cpv - b.cpv || b.visits - a.visits);
+  const all = [...m.values()].map(g => ({ ...g, cpv: g.visits > 0 ? g.cost / g.visits : null }));
+  const withVisits = all.filter(g => g.visits > 0);
+  const noVisits = all.filter(g => g.visits === 0 && g.cost > 0).sort((a, b) => b.cost - a.cost);
+  return {
+    best: [...withVisits].sort((a, b) => a.cpv - b.cpv || b.visits - a.visits).slice(0, 5),
+    worst: [...noVisits, ...[...withVisits].sort((a, b) => b.cpv - a.cpv || a.visits - b.visits)].slice(0, 5)
+  };
 }
 
+const hh = h => String(h).padStart(2, "0");
+const DIMS = [
+  { title: "Line items", key: r => r.line_item_name, label: g => g.row.line_item_name },
+  { title: "Banners", key: r => r.banner + "\u0001" + r.line_item_name, label: g => g.row.banner, sub: g => g.row.line_item_name },
+  { title: "Dates", key: r => r.date, label: g => g.row.date },
+  { title: "App IDs", key: r => r.app_id, label: g => g.row.app_id },
+  { title: "Deal IDs", key: r => r.dealid + "\u0001" + r.line_item_name, label: g => g.row.dealid, sub: g => g.row.line_item_name },
+  { title: "Hours", key: r => r.hour, label: g => `${hh(g.row.hour)}:00–${hh(g.row.hour)}:59` }
+];
+
+// Lets long names like Philips_ES_Prospecting_OOHomepage wrap at underscores instead of mid-word
+const brk = s => esc(s).replace(/_/g, "_<wbr>");
+
 function renderWidgets(rows) {
-  const none = `<div class="none">Sin visitas con los filtros actuales</div>`;
-  const cpvLine = g => `<div class="cpv">${fDec.format(g.cpv)} <small>por visita · ${fInt.format(g.visits)} visita${g.visits === 1 ? "" : "s"}</small></div>`;
-  const card = (title, g, sub) => `<div class="w"><h3>${title}</h3>${g
-    ? `<div class="name">${esc(g.row[sub[0]])}</div>${sub[1] ? `<div class="sub">Line item: ${esc(g.row[sub[1]])}</div>` : ""}${cpvLine(g)}`
-    : none}</div>`;
+  const item = (g, dim) => `<li>
+      <div class="lbl"><span class="name">${brk(dim.label(g))}</span>${dim.sub ? `<span class="sub">${brk(dim.sub(g))}</span>` : ""}</div>
+      <div class="val">${g.cpv == null
+        ? `<span class="bad">No visits</span><small>${fDec.format(g.cost)} spent</small>`
+        : `<span>${fDec.format(g.cpv)}</span><small>${fInt.format(g.visits)} visit${g.visits === 1 ? "" : "s"}</small>`}</div>
+    </li>`;
+  const list = (title, cls, arr, dim) => `<div class="rank ${cls}"><h4>${title}</h4>${arr.length
+    ? `<ol>${arr.map(g => item(g, dim)).join("")}</ol>` : `<div class="none">No data for the current filters</div>`}</div>`;
 
-  const li = bestBy(rows, r => r.line_item_name)[0];
-  const bn = bestBy(rows, r => r.banner + "\u0001" + r.line_item_name)[0];
-  const dl = bestBy(rows, r => r.dealid + "\u0001" + r.line_item_name)[0];
-  const hrs = bestBy(rows, r => r.hour).slice(0, 3);
-  const hh = h => String(h).padStart(2, "0");
-
-  document.getElementById("widgets-opt").innerHTML =
-    card("Line item con mejor coste por visita", li, ["line_item_name"]) +
-    card("Banner con mejor coste por visita", bn, ["banner", "line_item_name"]) +
-    card("Deal ID con mejor coste por visita", dl, ["dealid", "line_item_name"]) +
-    `<div class="w"><h3>Horas con mejor coste por visita</h3>${hrs.length
-      ? `<ol>${hrs.map(g => `<li>${hh(g.key)}:00–${hh(g.key)}:59 · <b>${fDec.format(g.cpv)}</b> <span class="muted">(${fInt.format(g.visits)} visita${g.visits === 1 ? "" : "s"})</span></li>`).join("")}</ol>`
-      : none}</div>`;
+  document.getElementById("widgets-opt").innerHTML = DIMS.map(dim => {
+    const r = rankBy(rows, dim.key);
+    return `<div class="w"><h3>${dim.title} by cost per visit</h3><div class="cols">
+      ${list("Best 5", "best", r.best, dim)}${list("Worst 5", "worst", r.worst, dim)}</div></div>`;
+  }).join("");
 }
 
 function buildOptWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Optimización", { views: [{ state: "frozen", ySplit: 1 }] });
+  const ws = wb.addWorksheet("Optimization", { views: [{ state: "frozen", ySplit: 1 }] });
   const widths = { campaign_name: 34, order_name: 18, line_item_name: 36, line_item_id: 13, banner: 46,
                    targeting_group: 16, app_id: 12, dealid: 15, date: 12, hour: 7 };
   const fmts = { impressions: XL.int, cost: XL.eur4, visits: XL.int, cost_per_visit: XL.eur,
@@ -538,19 +562,19 @@ setupDrop("drop-opt", "file-opt", async file => {
   if (!raw) return;
   const rows = prepOpt(raw);
   opt = { rows, filtered: rows, page: 0, name: baseName(file.name) };
-  compactDrop("drop-opt", file.name, "Arrastra otro CSV o haz clic para cambiarlo");
+  compactDrop("drop-opt", file.name, "Drop another CSV or click to replace it");
   buildFilters();
   renderOpt();
 });
 document.getElementById("clear-opt").addEventListener("click", () => {
   document.querySelectorAll("#filters-opt input[type=checkbox]").forEach(i => i.checked = false);
-  document.querySelectorAll("#filters-opt details.ms small").forEach(s => s.textContent = "Todos");
+  document.querySelectorAll("#filters-opt details.ms small").forEach(s => s.textContent = "All");
   applyOpt();
 });
 document.getElementById("dl-opt").addEventListener("click", e =>
   saveWorkbook(buildOptWorkbook(opt.filtered), opt.name + ".xlsx", e.currentTarget));
 
-/* Evita que soltar un archivo fuera de la zona abra el CSV en el navegador */
+/* Prevent a file dropped outside the drop zone from opening in the browser */
 ["dragover", "drop"].forEach(ev => window.addEventListener(ev, e => {
   if (!e.target.closest(".drop")) e.preventDefault();
 }));
