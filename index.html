@@ -106,8 +106,8 @@
 <header>
   <h1>CTV Reports</h1>
   <nav role="tablist">
-    <button role="tab" id="tab-atr" aria-selected="true" aria-controls="panel-atr">Attribution</button>
-    <button role="tab" id="tab-opt" aria-selected="false" aria-controls="panel-opt">Optimization</button>
+    <button role="tab" id="tab-atr" aria-selected="true" aria-controls="panel-atr">CTV Attribution report - Client</button>
+    <button role="tab" id="tab-opt" aria-selected="false" aria-controls="panel-opt">CTV Attribution report Optimization - Internal</button>
   </nav>
 </header>
 
@@ -352,7 +352,7 @@ function renderAtr() {
 
 function buildAtrWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Attribution", { views: [{ state: "frozen", ySplit: 1 }] });
+  const ws = wb.addWorksheet("Client", { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = [
     { header: "campaign_name", width: 34 }, { header: "order_name", width: 18 },
     { header: "line_item_name", width: 38 }, { header: "impressions", width: 14, style: { numFmt: XL.int } },
@@ -388,7 +388,7 @@ setupDrop("drop-atr", "file-atr", async file => {
   renderAtr();
 });
 document.getElementById("dl-atr").addEventListener("click", e =>
-  saveWorkbook(buildAtrWorkbook(atr.rows), atr.name + ".xlsx", e.currentTarget));
+  saveWorkbook(buildAtrWorkbook(atr.rows), "Client.xlsx", e.currentTarget));
 
 /* ========================================================== OPTIMIZATION */
 let opt = null; // { rows, name, filtered, page }
@@ -527,7 +527,7 @@ function renderWidgets(rows) {
 
 function buildOptWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Optimization", { views: [{ state: "frozen", ySplit: 1 }] });
+  const ws = wb.addWorksheet("Internal", { views: [{ state: "frozen", ySplit: 1 }] });
   const widths = { campaign_name: 34, order_name: 18, line_item_name: 36, line_item_id: 13, banner: 46,
                    targeting_group: 16, app_id: 12, dealid: 15, date: 12, hour: 7 };
   const fmts = { impressions: XL.int, cost: XL.eur4, visits: XL.int, cost_per_visit: XL.eur,
@@ -572,7 +572,7 @@ document.getElementById("clear-opt").addEventListener("click", () => {
   applyOpt();
 });
 document.getElementById("dl-opt").addEventListener("click", e =>
-  saveWorkbook(buildOptWorkbook(opt.filtered), opt.name + ".xlsx", e.currentTarget));
+  saveWorkbook(buildOptWorkbook(opt.filtered), "Internal.xlsx", e.currentTarget));
 
 /* Prevent a file dropped outside the drop zone from opening in the browser */
 ["dragover", "drop"].forEach(ev => window.addEventListener(ev, e => {
