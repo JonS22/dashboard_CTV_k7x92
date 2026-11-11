@@ -8,14 +8,14 @@
   :root {
     --bg: #F5F7FA; --surface: #FFFFFF; --text: #1B2430; --muted: #5B6676;
     --line: #DCE1E8; --brand: #1F3A5F; --brand-soft: #E6EDF6; --accent: #2F7D6D;
-    --danger: #B3261E; --row-alt: #F9FAFC;
+    --danger: #B3261E; --row-alt: #F9FAFC; --good-bg: #E7F4F0; --bad-bg: #FBEAE9;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12161C; --surface: #1A2028; --text: #E6EAF0; --muted: #9AA5B4;
       --line: #2C3540; --brand: #8DB4E2; --brand-soft: #22303F; --accent: #6CC3AE;
-      --danger: #F2827A; --row-alt: #1E252E;
+      --danger: #F2827A; --row-alt: #1E252E; --good-bg: #183129; --bad-bg: #3A1F1E;
       color-scheme: dark;
     }
   }
@@ -98,6 +98,28 @@
   .rank.best .val span { color: var(--accent); }
   .rank .val .bad { color: var(--danger); }
   .w .none { color: var(--muted); font-size: 13px; }
+  .rtables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 12px; margin-top: 12px; }
+  .rt { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 10px; min-width: 0; }
+  .rt h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .rt .legend { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .rt .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 10px; }
+  .rt .legend i.g { background: var(--accent); margin-left: 0; }
+  .rt .legend i.r { background: var(--danger); }
+  .rt .scroll { max-height: 440px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+  .rt table { font-size: 13px; }
+  .rt th { z-index: 1; }
+  .rt td { vertical-align: top; }
+  .rt td.lbl { white-space: normal; min-width: 180px; }
+  .rt td.lbl .sub { display: block; font-size: 12px; color: var(--muted); }
+  .rt td.rk { color: var(--muted); width: 1%; }
+  .rt tbody tr:nth-child(even) { background: transparent; }
+  .rt tbody tr.good:nth-child(n) { background: var(--good-bg); }
+  .rt tr.good td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .rt tr.good td.cpv { color: var(--accent); font-weight: 600; }
+  .rt tbody tr.bad:nth-child(n) { background: var(--bad-bg); }
+  .rt tr.bad td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+  .rt tr.bad td.cpv { color: var(--danger); font-weight: 600; }
+  .rt td.cpv small { display: block; font-weight: 400; font-size: 11px; }
   .pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 10px; color: var(--muted); }
   .muted { color: var(--muted); }
 </style>
@@ -141,6 +163,7 @@
     <div id="out-opt" hidden>
       <div class="filters" id="filters-opt"></div>
       <div class="widgets" id="widgets-opt"></div>
+      <div class="rtables" id="tables-opt"></div>
       <div class="toolbar">
         <span class="muted" id="info-opt"></span>
         <span>
@@ -453,6 +476,7 @@ function renderOpt() {
     `cost per visit ${T.vis ? fDec.format(T.cost / T.vis) : "—"}`;
 
   renderWidgets(rows);
+  renderRankTables(rows);
 
   const cell = (k, v) => k === "cost" ? `<td class="n">${fDec4.format(v)}</td>`
     : k === "cost_per_visit" ? (v == null ? `<td class="n empty">—</td>` : `<td class="n">${fDec.format(v)}</td>`)
@@ -522,6 +546,57 @@ function renderWidgets(rows) {
     const r = rankBy(rows, dim.key);
     return `<div class="w"><h3>${dim.title} by cost per visit</h3><div class="cols">
       ${list("Best 5", "best", r.best, dim)}${list("Worst 5", "worst", r.worst, dim)}</div></div>`;
+  }).join("");
+}
+
+/* Full ranking tables, ordered best → worst:
+   1) groups with visits, lowest CPV first
+   2) groups with visits, highest CPV last
+   3) groups without visits, ordered by spend (highest spend last).
+   Green = first 5 groups with visits. Red = last 5 rows (same "worst" logic as the widgets). */
+function orderAll(rows, keyFn) {
+  const m = new Map();
+  rows.forEach(r => {
+    const k = keyFn(r);
+    const g = m.get(k) || { key: k, row: r, imp: 0, cost: 0, visits: 0 };
+    g.imp += r.impressions; g.cost += r.cost; g.visits += r.visits; m.set(k, g);
+  });
+  const all = [...m.values()].map(g => ({ ...g, cpv: g.visits > 0 ? g.cost / g.visits : null }));
+  const withV = all.filter(g => g.visits > 0).sort((a, b) => a.cpv - b.cpv || b.visits - a.visits);
+  const noV = all.filter(g => g.visits === 0).sort((a, b) => a.cost - b.cost);
+  return [...withV, ...noV];
+}
+
+const TABLES = [
+  { title: "Cost per visit by line item", key: r => r.line_item_name, label: g => g.row.line_item_name },
+  { title: "Cost per visit by hour", key: r => r.hour + "\u0001" + r.line_item_name,
+    label: g => `${hh(g.row.hour)}:00–${hh(g.row.hour)}:59`, sub: g => g.row.line_item_name },
+  { title: "Cost per visit by banner", key: r => r.banner + "\u0001" + r.line_item_name,
+    label: g => g.row.banner, sub: g => g.row.line_item_name },
+  { title: "Cost per visit by app ID", key: r => r.app_id + "\u0001" + r.line_item_name,
+    label: g => g.row.app_id, sub: g => g.row.line_item_name }
+];
+
+function renderRankTables(rows) {
+  document.getElementById("tables-opt").innerHTML = TABLES.map(tb => {
+    const list = orderAll(rows, tb.key);
+    const nGood = Math.min(5, list.filter(g => g.visits > 0).length);
+    const badFrom = Math.max(nGood, list.length - 5);
+    const body = list.length ? list.map((g, i) => {
+      const cls = i < nGood ? "good" : i >= badFrom ? "bad" : "";
+      const cpv = g.cpv == null
+        ? `<td class="n cpv">${g.cost > 0 ? "No visits" : "—"}</td>`
+        : `<td class="n cpv">${fDec.format(g.cpv)}</td>`;
+      return `<tr class="${cls}"><td class="n rk">${i + 1}</td>
+        <td class="lbl">${brk(tb.label(g))}${tb.sub ? `<span class="sub">${brk(tb.sub(g))}</span>` : ""}</td>
+        <td class="n">${fInt.format(g.imp)}</td><td class="n">${fDec.format(g.cost)}</td>
+        <td class="n">${fInt.format(g.visits)}</td>${cpv}</tr>`;
+    }).join("") : `<tr><td colspan="6" class="empty">No data for the current filters</td></tr>`;
+    return `<div class="rt"><h3>${tb.title}</h3>
+      <div class="legend"><i class="g"></i>Best 5<i class="r"></i>Worst 5 · ${fInt.format(list.length)} row${list.length === 1 ? "" : "s"}</div>
+      <div class="scroll"><table><thead><tr><th class="n">#</th><th>${tb.title.replace("Cost per visit by ", "").replace(/^./, c => c.toUpperCase())}</th>
+      <th class="n">Impressions</th><th class="n">Cost</th><th class="n">Visits</th><th class="n">Cost per visit</th></tr></thead>
+      <tbody>${body}</tbody></table></div></div>`;
   }).join("");
 }
 
