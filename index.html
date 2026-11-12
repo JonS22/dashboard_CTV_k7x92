@@ -101,6 +101,13 @@
   .rtables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 12px; margin-top: 12px; }
   .rt { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 10px; min-width: 0; }
   .rt h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .rt .rt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .rt .rt-head h3 { margin: 0; }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0;
+              border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--brand); cursor: pointer; }
+  .icon-btn:hover { background: var(--brand-soft); }
+  .icon-btn:disabled { opacity: .55; cursor: wait; }
+  .icon-btn svg { width: 16px; height: 16px; }
   .rt .legend { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
   .rt .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 10px; }
   .rt .legend i.g { background: var(--accent); margin-left: 0; }
@@ -374,9 +381,57 @@ function renderAtr() {
   document.getElementById("out-atr").hidden = false;
 }
 
+/* "Front Page" sheet: summary box with the reporting period.
+   From: always 05/11/2026 00:00:00. To: the day before the download date, 23:59:59 (user's computer date).
+   Dates are stored as real Excel dates (built in UTC so Excel shows exactly these values). */
+function addFrontPage(wb) {
+  const fp = wb.addWorksheet("Front Page");
+  const now = new Date();
+  const from = new Date(Date.UTC(2026, 10, 5, 0, 0, 0));
+  const to = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59));
+  const grey = { style: "thin", color: { argb: "FF808080" } };
+
+  fp.getColumn(1).width = 2.5;
+  fp.getColumn(2).width = 38;
+  fp.getColumn(3).width = 38;
+
+  fp.mergeCells("B2:C2");
+  const head = fp.getCell("B2");
+  head.value = "Summary";
+  head.font = { name: "Calibri", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+  head.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF808080" } };
+  head.alignment = { vertical: "middle" };
+  head.border = { top: grey, left: grey, right: grey };
+  fp.getRow(2).height = 16;
+
+  [["Reporting Period From", from], ["Reporting Period To", to]].forEach(([label, date], i) => {
+    const r = 3 + i, last = i === 1;
+    const row = fp.getRow(r);
+    row.height = 27;
+    const a = row.getCell(2), b = row.getCell(3);
+    a.value = label;
+    a.font = { name: "Calibri", size: 9, bold: true, color: { argb: "FF595959" } };
+    a.alignment = { vertical: "middle", indent: 1 };
+    a.border = { left: grey, ...(last ? { bottom: grey } : {}) };
+    b.value = date;
+    b.numFmt = "dd/mm/yyyy hh:mm:ss";
+    b.font = { name: "Calibri", size: 9, color: { argb: "FF595959" } };
+    b.alignment = { horizontal: "right", vertical: "middle" };
+    b.border = { right: grey, ...(last ? { bottom: grey } : {}) };
+  });
+}
+
+// Download file name: CTV_Attribution_Titan_Adform_<day>_<Month>.xlsx, using the download date (e.g. _12_November)
+function clientFileName() {
+  const d = new Date();
+  const month = d.toLocaleString("en-US", { month: "long" });
+  return `CTV_Attribution_Titan_Adform_${d.getDate()}_${month}.xlsx`;
+}
+
 function buildAtrWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Client", { views: [{ state: "frozen", ySplit: 1 }] });
+  addFrontPage(wb);
+  const ws = wb.addWorksheet("CTV_Attribution_report", { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = [
     { header: "campaign_name", width: 34 }, { header: "order_name", width: 18 },
     { header: "line_item_name", width: 38 }, { header: "impressions", width: 14, style: { numFmt: XL.int } },
@@ -412,7 +467,7 @@ setupDrop("drop-atr", "file-atr", async file => {
   renderAtr();
 });
 document.getElementById("dl-atr").addEventListener("click", e =>
-  saveWorkbook(buildAtrWorkbook(atr.rows), "Client.xlsx", e.currentTarget));
+  saveWorkbook(buildAtrWorkbook(atr.rows), clientFileName(), e.currentTarget));
 
 /* ========================================================== OPTIMIZATION */
 let opt = null; // { rows, name, filtered, page }
@@ -579,7 +634,7 @@ const TABLES = [
   { title: "Cost per visit by line item", key: r => r.line_item_name, label: g => g.row.line_item_name },
   { title: "Cost per visit by hour", key: r => r.hour + "\u0001" + r.line_item_name,
     label: g => `${hh(g.row.hour)}:00–${hh(g.row.hour)}:59`, sub: g => g.row.line_item_name },
-  { title: "Cost per visit by banner", key: r => r.banner + "\u0001" + r.line_item_name,
+  { title: "Cost per visit by banner", exportId: "banner", key: r => r.banner + "\u0001" + r.line_item_name,
     label: g => g.row.banner, sub: g => g.row.line_item_name },
   { title: "Cost per visit by app ID", key: r => r.app_id + "\u0001" + r.line_item_name,
     label: g => g.row.app_id, sub: g => g.row.line_item_name }
@@ -600,13 +655,59 @@ function renderRankTables(rows) {
         <td class="n">${fInt.format(g.imp)}</td><td class="n">${fDec.format(g.cost)}</td>
         <td class="n">${fInt.format(g.visits)}</td>${cpv}</tr>`;
     }).join("") : `<tr><td colspan="6" class="empty">No data for the current filters</td></tr>`;
-    return `<div class="rt"><h3>${tb.title}</h3>
+    const head = tb.exportId
+      ? `<div class="rt-head"><h3>${tb.title}</h3><button class="icon-btn" data-export="${tb.exportId}" title="Download this table as Excel" aria-label="Download ${tb.title} as Excel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button></div>`
+      : `<h3>${tb.title}</h3>`;
+    return `<div class="rt">${head}
       <div class="legend"><i class="g"></i>Best 5<i class="r"></i>Worst 5 · ${fInt.format(list.length)} row${list.length === 1 ? "" : "s"}</div>
       <div class="scroll"><table><thead><tr><th class="n">#</th><th>${tb.title.replace("Cost per visit by ", "").replace(/^./, c => c.toUpperCase())}</th>
       <th class="n">Impressions</th><th class="n">Cost</th><th class="n">Visits</th><th class="n">Cost per visit</th></tr></thead>
       <tbody>${body}</tbody></table></div></div>`;
   }).join("");
 }
+
+/* Export of the "Cost per visit by banner" table: same rows and order as on screen (current filters applied). */
+function bannerFileName() {
+  const d = new Date();
+  return `Cost_per_visit_by_banner_${d.getDate()}_${d.toLocaleString("en-US", { month: "long" })}.xlsx`;
+}
+
+function buildBannerWorkbook(list) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Cost per visit by banner", { views: [{ state: "frozen", ySplit: 1 }] });
+  ws.columns = [
+    { header: "#", width: 6 }, { header: "Banner", width: 46 }, { header: "Line item", width: 38 },
+    { header: "Impressions", width: 14, style: { numFmt: XL.int } }, { header: "Cost", width: 12, style: { numFmt: XL.eur } },
+    { header: "Visits", width: 10, style: { numFmt: XL.int } }, { header: "Cost per visit", width: 15, style: { numFmt: XL.eur } }
+  ];
+  list.forEach((g, i) => {
+    const n = i + 2;
+    const row = ws.addRow([i + 1, g.row.banner, g.row.line_item_name, g.imp, g.cost, g.visits,
+      { formula: `IF(F${n}=0,"No visits",E${n}/F${n})`, result: g.cpv == null ? "No visits" : g.cpv }]);
+    row.eachCell({ includeEmpty: true }, c => { c.font = XL.font; });
+    row.getCell(7).alignment = { horizontal: "right" };
+  });
+  styleHeader(ws, 7);
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: list.length + 1, column: 7 } };
+  return wb;
+}
+
+document.getElementById("tables-opt").addEventListener("click", async e => {
+  const btn = e.target.closest('[data-export="banner"]');
+  if (!btn || !opt) return;
+  const tb = TABLES.find(x => x.exportId === "banner");
+  btn.disabled = true;
+  try {
+    const buf = await buildBannerWorkbook(orderAll(opt.filtered, tb.key)).xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = bannerFileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } finally { btn.disabled = false; }
+});
 
 function buildOptWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
