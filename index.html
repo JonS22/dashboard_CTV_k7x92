@@ -162,6 +162,7 @@
     <div class="error" id="err-opt" role="alert"></div>
     <div id="out-opt" hidden>
       <div class="filters" id="filters-opt"></div>
+      <div class="kpis" id="kpis-opt"></div>
       <div class="widgets" id="widgets-opt"></div>
       <div class="rtables" id="tables-opt"></div>
       <div class="toolbar">
@@ -474,6 +475,13 @@ function renderOpt() {
     `${fInt.format(rows.length)} of ${fInt.format(opt.rows.length)} rows · ${fInt.format(T.imp)} impressions · ` +
     `cost ${fDec.format(T.cost)} · ${fInt.format(T.vis)} visits · ` +
     `cost per visit ${T.vis ? fDec.format(T.cost / T.vis) : "—"}`;
+
+  // Same cards as the Client tab, computed from the filtered rows (all filters, including "Only rows with visits")
+  const cpvOpt = T.vis ? T.cost / T.vis : null;
+  document.getElementById("kpis-opt").innerHTML = [
+    ["Impressions", fInt.format(T.imp)], ["Cost", fDec.format(T.cost)], ["Visits", fInt.format(T.vis)],
+    ["Cost per visit", cpvOpt == null ? "—" : fDec.format(cpvOpt), true]
+  ].map(([l, v, hl]) => `<div class="kpi${hl ? " hl" : ""}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
   renderWidgets(rows);
   renderRankTables(rows);
