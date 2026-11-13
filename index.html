@@ -341,11 +341,22 @@ async function saveWorkbook(wb, fileName, btn) {
 /* ============================================================ ATTRIBUTION */
 let atr = null; // { rows, name }
 
+/* New-format columns (banner, app_id, app_name, cpm) are optional: old-format CSVs still load, with these left empty.
+   Inventory/Publisher is taken from line_item_name (AEFAST, OOFAST or OOHOMEPAGE, in capitals); empty if none appears. */
+function inventoryOf(lineItem) {
+  const m = String(lineItem ?? "").match(/AEFAST|OOFAST|OOHOMEPAGE/i);
+  return m ? m[0].toUpperCase() : "";
+}
+
 function prepAtr(raw) {
   return raw.map(r => {
+    const cpm = r.cpm == null || String(r.cpm).trim() === "" ? null : Number(r.cpm);
     const o = {
       campaign_name: r.campaign_name, order_name: r.order_name, line_item_name: r.line_item_name,
+      inventory: inventoryOf(r.line_item_name),
+      banner: r.banner ?? "", app_id: r.app_id ?? "", app_name: r.app_name ?? "",
       impressions: Number(r.impressions) || 0, cost: Number(r.cost) || 0,
+      cpm: Number.isFinite(cpm) ? cpm : null,
       visits: Number(r.visits) || 0
     };
     o.cost_per_visit = o.visits > 0 ? o.cost / o.visits : null;
@@ -357,26 +368,31 @@ function renderAtr() {
   const rows = atr.rows;
   const T = { imp: sum(rows, "impressions"), cost: sum(rows, "cost"), vis: sum(rows, "visits") };
   const cpv = T.vis ? T.cost / T.vis : null;
+  const cpmT = T.imp ? T.cost / T.imp * 1000 : null; // weighted CPM: total cost / total impressions × 1,000
 
   document.getElementById("kpis-atr").innerHTML = [
-    ["Impressions", fInt.format(T.imp)], ["Cost", fDec.format(T.cost)], ["Visits", fInt.format(T.vis)],
+    ["Impressions", fInt.format(T.imp)], ["Cost", fDec.format(T.cost)], ["CPM", cpmT == null ? "—" : fDec.format(cpmT)],
+    ["Visits", fInt.format(T.vis)],
     ["Cost per visit", cpv == null ? "—" : fDec.format(cpv), true]
   ].map(([l, v, hl]) => `<div class="kpi${hl ? " hl" : ""}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
-  document.getElementById("info-atr").textContent = `${rows.length} line items`;
+  document.getElementById("info-atr").textContent = `${fInt.format(rows.length)} rows`;
 
-  const head = ["campaign_name", "order_name", "line_item_name", "impressions", "cost", "visits", "cost_per_visit"];
-  const num = new Set(["impressions", "cost", "visits", "cost_per_visit"]);
+  const head = ["campaign_name", "order_name", "line_item_name", "inventory", "banner", "app_id", "app_name",
+                "impressions", "cost", "cpm", "visits", "cost_per_visit"];
+  const label = { inventory: "Inventory/Publisher" };
+  const num = new Set(["impressions", "cost", "cpm", "visits", "cost_per_visit"]);
   const cell = (k, v) => {
-    if (k === "cost" || k === "cost_per_visit") return v == null ? `<td class="n empty">—</td>` : `<td class="n">${fDec.format(v)}</td>`;
+    if (k === "cost" || k === "cost_per_visit" || k === "cpm") return v == null ? `<td class="n empty">—</td>` : `<td class="n">${fDec.format(v)}</td>`;
     if (num.has(k)) return `<td class="n">${fInt.format(v)}</td>`;
     return `<td>${esc(v ?? "")}</td>`;
   };
   document.getElementById("tbl-atr").innerHTML =
-    `<thead><tr>${head.map(h => `<th class="${num.has(h) ? "n" : ""}">${h}</th>`).join("")}</tr></thead>` +
+    `<thead><tr>${head.map(h => `<th class="${num.has(h) ? "n" : ""}">${label[h] || h}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map(r => `<tr>${head.map(k => cell(k, r[k])).join("")}</tr>`).join("")}</tbody>` +
-    `<tfoot><tr><td>Total</td><td></td><td></td><td class="n">${fInt.format(T.imp)}</td><td class="n">${fDec.format(T.cost)}</td>` +
-    `<td class="n">${fInt.format(T.vis)}</td>` +
+    `<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td>` +
+    `<td class="n">${fInt.format(T.imp)}</td><td class="n">${fDec.format(T.cost)}</td>` +
+    `<td class="n">${cpmT == null ? "—" : fDec.format(cpmT)}</td><td class="n">${fInt.format(T.vis)}</td>` +
     `<td class="n">${cpv == null ? "—" : fDec.format(cpv)}</td></tr></tfoot>`;
   document.getElementById("out-atr").hidden = false;
 }
@@ -432,30 +448,37 @@ function buildAtrWorkbook(rows) {
   const wb = new ExcelJS.Workbook();
   addFrontPage(wb);
   const ws = wb.addWorksheet("CTV_Attribution_report", { views: [{ state: "frozen", ySplit: 1 }] });
+  // A campaign · B order · C line item · D Inventory/Publisher · E banner · F app_id · G app_name
+  // H impressions · I cost · J cpm · K visits · L cost_per_visit
   ws.columns = [
     { header: "campaign_name", width: 34 }, { header: "order_name", width: 18 },
-    { header: "line_item_name", width: 38 }, { header: "impressions", width: 14, style: { numFmt: XL.int } },
-    { header: "cost", width: 13, style: { numFmt: XL.eur } }, { header: "visits", width: 10, style: { numFmt: XL.int } },
+    { header: "line_item_name", width: 38 }, { header: "Inventory/Publisher", width: 18 },
+    { header: "banner", width: 44 }, { header: "app_id", width: 16, style: { numFmt: "@" } }, { header: "app_name", width: 24 },
+    { header: "impressions", width: 14, style: { numFmt: XL.int } },
+    { header: "cost", width: 13, style: { numFmt: XL.eur } }, { header: "cpm", width: 10, style: { numFmt: XL.eur } },
+    { header: "visits", width: 10, style: { numFmt: XL.int } },
     { header: "cost_per_visit", width: 15, style: { numFmt: XL.eur } }
   ];
   rows.forEach((r, i) => {
     const n = i + 2;
-    const row = ws.addRow([r.campaign_name, r.order_name, r.line_item_name, r.impressions, r.cost, r.visits,
-      { formula: `IF(F${n}=0,"",E${n}/F${n})`, result: r.cost_per_visit == null ? "" : r.cost_per_visit }]);
+    const row = ws.addRow([r.campaign_name, r.order_name, r.line_item_name, r.inventory, r.banner, String(r.app_id), r.app_name,
+      r.impressions, r.cost, r.cpm == null ? "" : r.cpm, r.visits,
+      { formula: `IF(K${n}=0,"",I${n}/K${n})`, result: r.cost_per_visit == null ? "" : r.cost_per_visit }]);
     row.eachCell({ includeEmpty: true }, c => { c.font = XL.font; if (i % 2) c.fill = XL.band; });
   });
   const last = rows.length + 1, t = last + 1;
   const T = { imp: sum(rows, "impressions"), cost: sum(rows, "cost"), vis: sum(rows, "visits") };
-  const tot = ws.addRow(["Total", "", "",
-    { formula: `SUM(D2:D${last})`, result: T.imp }, { formula: `SUM(E2:E${last})`, result: T.cost },
-    { formula: `SUM(F2:F${last})`, result: T.vis },
-    { formula: `IF(F${t}=0,"",E${t}/F${t})`, result: T.vis ? T.cost / T.vis : "" }]);
+  const tot = ws.addRow(["Total", "", "", "", "", "", "",
+    { formula: `SUM(H2:H${last})`, result: T.imp }, { formula: `SUM(I2:I${last})`, result: T.cost },
+    { formula: `IF(H${t}=0,"",I${t}/H${t}*1000)`, result: T.imp ? T.cost / T.imp * 1000 : "" },
+    { formula: `SUM(K2:K${last})`, result: T.vis },
+    { formula: `IF(K${t}=0,"",I${t}/K${t})`, result: T.vis ? T.cost / T.vis : "" }]);
   tot.eachCell({ includeEmpty: true }, c => {
     c.font = { ...XL.font, bold: true };
     c.border = { top: { style: "thin" }, bottom: { style: "double" } };
   });
-  styleHeader(ws, 7);
-  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: last, column: 7 } };
+  styleHeader(ws, 12);
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: last, column: 12 } };
   return wb;
 }
 
