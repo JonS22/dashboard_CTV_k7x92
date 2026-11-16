@@ -172,7 +172,6 @@
       <div class="kpis" id="kpis-opt"></div>
       <div class="rtables" id="daily-opt">
         <div class="rt"><h3>Daily Cost per Visit</h3><div class="scroll"><table id="tbl-daily-cpv"></table></div></div>
-        <div class="rt"><h3>Visits per day</h3><div class="scroll"><table id="tbl-daily-visits"></table></div></div>
       </div>
       <div class="widgets" id="widgets-opt"></div>
       <div class="rtables" id="tables-opt"></div>
@@ -640,7 +639,7 @@ function renderWidgets(rows) {
   }).join("");
 }
 
-/* Daily tables (current filters applied): split by day plus a total row. The optimization CSV is cumulative,
+/* Daily Cost per Visit table (current filters applied): split by day plus a total row. The optimization CSV is cumulative,
    so the latest file already contains every day of the period. */
 function renderDaily(rows) {
   const m = new Map();
@@ -659,11 +658,6 @@ function renderDaily(rows) {
       `<td class="n">${fInt.format(d.visits)}</td><td class="n${d.visits ? "" : " empty"}">${money(d.cost, d.visits, "No visits")}</td></tr>`).join("") : empty(4)}</tbody>` +
     `<tfoot><tr><td>Total</td><td class="n">${fDec.format(totCost)}</td><td class="n">${fInt.format(totVis)}</td>` +
     `<td class="n">${money(totCost, totVis, "—")}</td></tr></tfoot>`;
-
-  document.getElementById("tbl-daily-visits").innerHTML =
-    `<thead><tr><th>Date</th><th class="n">Visits</th></tr></thead>` +
-    `<tbody>${days.length ? days.map(d => `<tr><td>${esc(d.date)}</td><td class="n">${fInt.format(d.visits)}</td></tr>`).join("") : empty(2)}</tbody>` +
-    `<tfoot><tr><td>Total</td><td class="n">${fInt.format(totVis)}</td></tr></tfoot>`;
 }
 
 /* Full ranking tables, ordered best → worst:
