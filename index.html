@@ -170,6 +170,10 @@
     <div id="out-opt" hidden>
       <div class="filters" id="filters-opt"></div>
       <div class="kpis" id="kpis-opt"></div>
+      <div class="rtables" id="daily-opt">
+        <div class="rt"><h3>Daily Cost per Visit</h3><div class="scroll"><table id="tbl-daily-cpv"></table></div></div>
+        <div class="rt"><h3>Visits per day</h3><div class="scroll"><table id="tbl-daily-visits"></table></div></div>
+      </div>
       <div class="widgets" id="widgets-opt"></div>
       <div class="rtables" id="tables-opt"></div>
       <div class="toolbar">
@@ -561,6 +565,7 @@ function renderOpt() {
     ["Cost per visit", cpvOpt == null ? "—" : fDec.format(cpvOpt), true]
   ].map(([l, v, hl]) => `<div class="kpi${hl ? " hl" : ""}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 
+  renderDaily(rows);
   renderWidgets(rows);
   renderRankTables(rows);
 
@@ -633,6 +638,32 @@ function renderWidgets(rows) {
     return `<div class="w"><h3>${dim.title} by cost per visit</h3><div class="cols">
       ${list("Best 5", "best", r.best, dim)}${list("Worst 5", "worst", r.worst, dim)}</div></div>`;
   }).join("");
+}
+
+/* Daily tables (current filters applied): split by day plus a total row. The optimization CSV is cumulative,
+   so the latest file already contains every day of the period. */
+function renderDaily(rows) {
+  const m = new Map();
+  rows.forEach(r => {
+    const g = m.get(r.date) || { date: r.date, cost: 0, visits: 0 };
+    g.cost += r.cost; g.visits += r.visits; m.set(r.date, g);
+  });
+  const days = [...m.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const totCost = days.reduce((a, d) => a + d.cost, 0), totVis = days.reduce((a, d) => a + d.visits, 0);
+  const money = (c, v, none) => v ? fDec.format(c / v) : none;
+  const empty = n => `<tr><td colspan="${n}" class="empty">No data for the current filters</td></tr>`;
+
+  document.getElementById("tbl-daily-cpv").innerHTML =
+    `<thead><tr><th>Date</th><th class="n">Cost</th><th class="n">Visits</th><th class="n">Cost per visit</th></tr></thead>` +
+    `<tbody>${days.length ? days.map(d => `<tr><td>${esc(d.date)}</td><td class="n">${fDec.format(d.cost)}</td>` +
+      `<td class="n">${fInt.format(d.visits)}</td><td class="n${d.visits ? "" : " empty"}">${money(d.cost, d.visits, "No visits")}</td></tr>`).join("") : empty(4)}</tbody>` +
+    `<tfoot><tr><td>Total</td><td class="n">${fDec.format(totCost)}</td><td class="n">${fInt.format(totVis)}</td>` +
+    `<td class="n">${money(totCost, totVis, "—")}</td></tr></tfoot>`;
+
+  document.getElementById("tbl-daily-visits").innerHTML =
+    `<thead><tr><th>Date</th><th class="n">Visits</th></tr></thead>` +
+    `<tbody>${days.length ? days.map(d => `<tr><td>${esc(d.date)}</td><td class="n">${fInt.format(d.visits)}</td></tr>`).join("") : empty(2)}</tbody>` +
+    `<tfoot><tr><td>Total</td><td class="n">${fInt.format(totVis)}</td></tr></tfoot>`;
 }
 
 /* Full ranking tables, ordered best → worst:
