@@ -71,10 +71,19 @@
   details.ms summary { list-style: none; padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
   details.ms summary::-webkit-details-marker { display: none; }
   details.ms summary small { color: var(--muted); }
-  details.ms .opts { position: absolute; z-index: 5; left: -1px; right: -1px; top: 100%; max-height: 260px; overflow: auto;
+  details.ms .opts { position: absolute; z-index: 5; left: -1px; top: 100%; max-height: 260px; overflow: auto;
+                     min-width: calc(100% + 2px); width: max-content; max-width: min(640px, calc(100vw - 32px));
                      background: var(--surface); border: 1px solid var(--line); border-radius: 0 0 6px 6px; padding: 6px 0; }
-  details.ms label { display: flex; gap: 8px; padding: 4px 12px; cursor: pointer; white-space: nowrap; }
+  details.ms label { display: flex; gap: 8px; padding: 4px 12px; cursor: pointer; white-space: normal; overflow-wrap: anywhere; }
+  details.ms label input { flex: none; margin-top: 3px; }
+  details.ms .opts.ms-right { left: auto; right: -1px; }
   details.ms label:hover { background: var(--brand-soft); }
+  details.ms label[hidden] { display: none; }
+  details.ms .ms-search { position: sticky; top: -6px; display: block; width: calc(100% - 16px); margin: 0 8px 6px; padding: 6px 8px;
+                          font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
+                          border: 1px solid var(--line); border-radius: 6px; z-index: 1; }
+  details.ms .ms-search:focus { outline: 2px solid var(--brand); outline-offset: 0; }
+  details.ms .ms-none { padding: 4px 12px; color: var(--muted); font-size: 13px; }
   .check { display: flex; align-items: center; gap: 8px; padding: 8px 4px; }
   .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 12px; margin-top: 16px; }
   .w { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
@@ -509,24 +518,50 @@ function prepOpt(raw) {
   });
 }
 
+// Filters of the Optimization tab with a search box inside the dropdown
+const SEARCH_FILTERS = new Set(["line_item_name", "banner", "app_id", "dealid"]);
+// Lower case without accents, for searching
+const foldText = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 function buildFilters() {
   const box = document.getElementById("filters-opt");
   box.innerHTML = FILTERS.map(([k, label]) => {
     const vals = [...new Set(opt.rows.map(r => r[k]))].sort((a, b) =>
       String(a).localeCompare(String(b), "es", { numeric: true }));
+    const search = SEARCH_FILTERS.has(k)
+      ? `<input type="search" class="ms-search" placeholder="Search ${label.toLowerCase()}…" aria-label="Search ${label}"><div class="ms-none" hidden>No matches</div>` : "";
     return `<details class="ms" data-key="${k}"><summary><span>${label}</span><small>All</small></summary>
-      <div class="opts">${vals.map(v => `<label><input type="checkbox" value="${esc(v)}">${esc(v)}</label>`).join("")}</div></details>`;
+      <div class="opts">${search}${vals.map(v => `<label data-text="${esc(foldText(v))}"><input type="checkbox" value="${esc(v)}">${esc(v)}</label>`).join("")}</div></details>`;
   }).join("") + `<label class="check"><input type="checkbox" id="only-visits"> Only rows with visits</label>`;
 
   box.querySelectorAll("details.ms").forEach(d => {
     d.addEventListener("toggle", () => {
       if (d.open) box.querySelectorAll("details.ms").forEach(o => { if (o !== d) o.open = false; });
+      // Wide lists near the right edge open towards the left so they stay on screen
+      if (d.open) {
+        const o = d.querySelector(".opts");
+        o.classList.remove("ms-right");
+        if (o.getBoundingClientRect().right > document.documentElement.clientWidth - 8) o.classList.add("ms-right");
+      }
     });
-    d.addEventListener("change", () => {
+    d.addEventListener("change", e => {
+      if (e.target.classList.contains("ms-search")) return; // typing in the search box does not filter data
       const n = d.querySelectorAll("input:checked").length;
       d.querySelector("small").textContent = n ? `${n} selected` : "All";
       applyOpt();
     });
+    const s = d.querySelector(".ms-search");
+    if (s) {
+      // Show only the options containing the typed text; checked options stay checked even when hidden
+      const run = () => {
+        const q = foldText(s.value.trim());
+        let shown = 0;
+        d.querySelectorAll(".opts label").forEach(l => { const ok = !q || l.dataset.text.includes(q); l.hidden = !ok; if (ok) shown++; });
+        d.querySelector(".ms-none").hidden = shown > 0;
+      };
+      s.addEventListener("input", run);
+      d.addEventListener("toggle", () => { if (d.open) s.focus(); else { s.value = ""; run(); } });
+    }
   });
   document.getElementById("only-visits").addEventListener("change", applyOpt);
 }
