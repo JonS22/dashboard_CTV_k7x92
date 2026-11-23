@@ -145,6 +145,21 @@
   .term dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
   .term .total dd { font-size: 15px; }
   .term .none { color: var(--muted); font-size: 13px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-top: 10px; }
+  .chart-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+  .chart { position: relative; min-height: 60px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .grid { stroke: var(--line); stroke-width: 1; }
+  .chart .axis-lbl { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .chart .line { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .chart .pt { fill: var(--surface); stroke: var(--brand); stroke-width: 2; }
+  .chart .pt.on { fill: var(--brand); }
+  .chart .guide { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .chart .hit { fill: transparent; cursor: crosshair; }
+  .chart .tip { position: absolute; pointer-events: none; background: var(--text); color: var(--surface); padding: 6px 9px; border-radius: 6px;
+                font-size: 12px; line-height: 1.35; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); }
+  .chart .tip b { font-size: 13px; }
+  .chart .none { color: var(--muted); font-size: 13px; padding: 8px 0; }
   .pager { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 10px; color: var(--muted); }
   .muted { color: var(--muted); }
 </style>
@@ -170,6 +185,10 @@
     <div id="out-atr" hidden>
       <div class="kpis" id="kpis-atr"></div>
       <div class="terms" id="terms-atr"></div>
+      <div class="chart-card">
+        <h3>Daily Cost per Visit</h3>
+        <div class="chart" id="chart-atr"></div>
+      </div>
       <div class="toolbar">
         <span class="muted" id="info-atr"></span>
         <button class="btn" id="dl-atr">Download Excel</button>
@@ -409,6 +428,75 @@ function renderTerms(rows) {
   }).join("");
 }
 
+/* Daily cost per visit line chart (Client tab). The Client CSV has no dates, so the data comes from the
+   optimization CSV loaded in the Internal tab (all its rows, not its filters). Days without visits leave a gap. */
+function renderAtrChart() {
+  const box = document.getElementById("chart-atr");
+  if (!box) return;
+  if (!opt || !opt.rows) {
+    box.innerHTML = `<div class="none">Load the optimization CSV in the “CTV Attribution report Optimization - Internal” tab to see this chart, then come back to this tab.</div>`;
+    return;
+  }
+  const m = new Map();
+  opt.rows.forEach(r => { const g = m.get(r.date) || { date: r.date, cost: 0, visits: 0 }; g.cost += r.cost; g.visits += r.visits; m.set(r.date, g); });
+  const days = [...m.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .map(d => ({ ...d, cpv: d.visits ? d.cost / d.visits : null }));
+  const vals = days.filter(d => d.cpv != null).map(d => d.cpv);
+  if (!vals.length) { box.innerHTML = `<div class="none">No visits in the optimization report, so there is no cost per visit to plot.</div>`; return; }
+
+  const W = Math.max(320, box.clientWidth || 800), H = 260, P = { l: 48, r: 16, t: 14, b: 30 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  // Nice y scale from 0
+  const raw = Math.max(...vals) * 1.1, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag / 4).find(s => raw / s <= 5) || raw / 5;
+  const yMax = Math.ceil(raw / step) * step;
+  const x = i => P.l + (days.length === 1 ? iw / 2 : i * iw / (days.length - 1));
+  const y = v => P.t + ih - v / yMax * ih;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily cost per visit line chart">`;
+  for (let v = 0; v <= yMax + 1e-9; v += step)
+    svg += `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}"/><text class="axis-lbl" x="${P.l - 8}" y="${y(v) + 4}" text-anchor="end">${fInt.format(v)}</text>`;
+  const every = Math.ceil(days.length / Math.max(1, Math.floor(iw / 70)));
+  days.forEach((d, i) => { if (i % every === 0 || i === days.length - 1)
+    svg += `<text class="axis-lbl" x="${x(i)}" y="${H - 8}" text-anchor="middle">${esc(String(d.date).slice(5))}</text>`; });
+  // Line split into segments at days without visits (gap)
+  let seg = [];
+  const flush = () => { if (seg.length > 1) svg += `<polyline class="line" points="${seg.join(" ")}"/>`; seg = []; };
+  days.forEach((d, i) => { if (d.cpv == null) flush(); else seg.push(`${x(i)},${y(d.cpv)}`); });
+  flush();
+  svg += `<line class="guide" id="chart-guide" x1="0" x2="0" y1="${P.t}" y2="${P.t + ih}" visibility="hidden"/>`;
+  days.forEach((d, i) => { if (d.cpv != null) svg += `<circle class="pt" data-i="${i}" cx="${x(i)}" cy="${y(d.cpv)}" r="4"/>`; });
+  // Hover areas: one column per day
+  days.forEach((d, i) => {
+    const half = days.length === 1 ? iw / 2 : iw / (days.length - 1) / 2;
+    svg += `<rect class="hit" data-i="${i}" x="${x(i) - half}" y="${P.t}" width="${half * 2}" height="${ih}"/>`;
+  });
+  svg += `</svg><div class="tip" hidden></div>`;
+  box.innerHTML = svg;
+
+  const tip = box.querySelector(".tip"), guide = box.querySelector("#chart-guide"), svgEl = box.querySelector("svg");
+  const hide = () => { tip.hidden = true; guide.setAttribute("visibility", "hidden"); box.querySelectorAll(".pt.on").forEach(c => c.classList.remove("on")); };
+  box.querySelectorAll(".hit").forEach(h => {
+    h.addEventListener("mouseenter", () => {
+      hide();
+      const i = +h.dataset.i, d = days[i], k = svgEl.getBoundingClientRect().width / W;
+      guide.setAttribute("x1", x(i)); guide.setAttribute("x2", x(i)); guide.setAttribute("visibility", "visible");
+      const pt = box.querySelector(`.pt[data-i="${i}"]`);
+      if (pt) pt.classList.add("on");
+      tip.innerHTML = `${esc(d.date)}<br><b>${d.cpv == null ? "No visits" : "Cost per visit: " + fDec.format(d.cpv)}</b>`;
+      tip.style.left = Math.min(Math.max(x(i) * k, 70), svgEl.getBoundingClientRect().width - 70) + "px";
+      tip.style.top = (d.cpv == null ? P.t + ih / 2 : y(d.cpv)) * k + "px";
+      tip.hidden = false;
+    });
+  });
+  svgEl.addEventListener("mouseleave", hide);
+}
+
+// Redraw when the window is resized, and when the Client tab is opened (picks up an optimization CSV loaded later)
+let chartTimer;
+window.addEventListener("resize", () => { clearTimeout(chartTimer); chartTimer = setTimeout(() => { if (atr) renderAtrChart(); }, 150); });
+document.getElementById("tab-atr").addEventListener("click", () => { if (atr) renderAtrChart(); });
+
 function renderAtr() {
   const rows = atr.rows;
   const T = { imp: sum(rows, "impressions"), cost: sum(rows, "cost"), vis: sum(rows, "visits") };
@@ -441,6 +529,7 @@ function renderAtr() {
     `<td class="n">${cpmT == null ? "—" : fDec.format(cpmT)}</td><td class="n">${fInt.format(T.vis)}</td>` +
     `<td class="n">${cpv == null ? "—" : fDec.format(cpv)}</td></tr></tfoot>`;
   document.getElementById("out-atr").hidden = false;
+  renderAtrChart();
 }
 
 /* "Front Page" sheet: summary box with the reporting period.
